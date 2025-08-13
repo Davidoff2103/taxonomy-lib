@@ -1,11 +1,14 @@
+from dotenv import load_dotenv
+import os
 import json
 import re
 from openai import OpenAI
+from typing import Literal
 
+load_dotenv()
 
-
-def propose_taxonomy(field, description):
-    client = OpenAI(base_url="http://51.83.112.195:8000/v1", api_key="EMPTY")
+def propose_taxonomy(field: str, description:str) -> list[str]:
+    client = OpenAI(base_url=os.getenv("SERVER_URL"), api_key=os.getenv("API_KEY"))
     examples = """
     Example 1:
     Field: "Color"
@@ -36,10 +39,10 @@ def propose_taxonomy(field, description):
         ]
     )
 
-    return re.sub(r"<think>.*?</think>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip()
+    return json.loads(response.choices[0].message.content.split("</think>", 1)[1].strip())
 
-def apply_taxonomy(discrete_fields, taxonomy):
-    client = OpenAI(base_url="http://51.83.112.195:8000/v1", api_key="EMPTY")
+def apply_taxonomy(discrete_fields: list[str], taxonomy: list[str]):
+    client = OpenAI(base_url=os.getenv("SERVER_URL"), api_key=os.getenv("API_KEY"))
 
     content = f"Discrete fields:\n{discrete_fields}\n\nTaxonomies:\n{taxonomy}\n\nClassify each field into one of the taxonomies. Respond only with key-value pairs in JSON format."
 
@@ -53,8 +56,8 @@ def apply_taxonomy(discrete_fields, taxonomy):
 
     return json.loads(re.sub(r"<think>.*?</think>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip())
 
-def analyze_text_field(field_name, field_value, task="label"):
-    client = OpenAI(base_url="http://51.83.112.195:8000/v1", api_key="EMPTY")
+def analyze_text_field(field_name: str, field_value: str, task: Literal["label", "summarize"] = "label"):
+    client = OpenAI(base_url=os.getenv("SERVER_URL"), api_key=os.getenv("API_KEY"))
 
     if task not in {"label", "summarize"}:
         raise ValueError("task must be 'label' or 'summarize'")
