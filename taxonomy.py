@@ -46,15 +46,55 @@ def apply_taxonomy(discrete_fields: list[str], taxonomy: list[str]):
 
     content = f"Discrete fields:\n{discrete_fields}\n\nTaxonomies:\n{taxonomy}\n\nClassify each field into one of the taxonomies. Respond only with key-value pairs in JSON format."
 
+    messages = [
+                {"role": "system", "content": "You are an assistant that classifies discrete dataset fields into taxonomies. Only use the web_search tool if you do not have enough information to assign a taxonomy confidently. Respond only with a JSON object containing field: taxonomy pairs."},
+                {"role": "user", "content": content}
+            ]
     response = client.chat.completions.create(
         model="Qwen/Qwen3-32B",
-        messages=[
-            {"role": "system", "content": "You are an assistant that classifies discrete dataset fields into taxonomies. Respond only with a JSON object containing field: taxonomy pairs."},
-            {"role": "user", "content": content}
-        ]
+        messages=messages,
+        tools = [{
+            "type": "function",
+            "function": {
+                "name": "web_search",
+                "description": "Get additional information about a discrete field value",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "The query to search about"
+                        }
+                    },
+                    "required": ["query"]
+                }
+            }
+        }]
     )
 
+    messages.append({
+        "role": "assistant",
+        "tool_calls": response.choices[0].message.tool_calls
+    })
+
+    completion_tool_calls = response.choices[0].message.tool_calls
+    for call in completion_tool_calls:
+        print(call)
+        args = json.loads(call.function.arguments)
+        result = web_search(**args)
+        print(result)
+        messages.append({
+            "role": "tool",
+            "content": result,
+            "tool_call_id": call.id,
+            "name": call.function.name
+        })
+    response = client.chat.completions.create(
+        model="Qwen/Qwen3-32B",
+        messages=messages
+    )
     return json.loads(re.sub(r"<think>.*?</think>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip())
+
 
 def analyze_text_field(field_name: str, field_value: str, task: Literal["label", "summarize"] = "label"):
     client = OpenAI(base_url=os.getenv("SERVER_URL"), api_key=os.getenv("API_KEY"))
@@ -84,6 +124,12 @@ def analyze_text_field(field_name: str, field_value: str, task: Literal["label",
     )
 
     return re.sub(r"<think>.*?</think>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip()
+
+
+def web_search(query):
+    """Search the web for additional information about the query topic, or if the question is outside the scope of the RAG tool."""
+    serp_api_wrapper = SerpAPIWrapper(serpapi_api_key=os.getenv("SERPAPI_API_KEY"))
+    return serp_api_wrapper.run(query)
 
 
 def main():
