@@ -52,7 +52,7 @@ def propose_taxonomy(field: str, description:str) -> list[str]:
 def normalize_street_name(street: str):
     s = street.split()
     MAPPING = {
-        "CL": "CARRER",
+        "CL": "Carrer",
         "BJ": "Baixada",
         "PZ": "Plaça",
         "AV": "Avinguda",
