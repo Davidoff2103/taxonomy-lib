@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+from tqdm import tqdm
 import os
 import faiss
 import json
@@ -109,15 +110,15 @@ def chunks(lst, size):
     for i in range(0, len(lst), size):
         yield lst[i:i+size]
 
-def apply_taxonomy(discrete_fields: list[str], taxonomy: list[str]):
+def apply_taxonomy_reasoning(discrete_fields: list[str], taxonomy: list[str]):
     client = OpenAI(base_url=os.getenv("SERVER_URL"), api_key=os.getenv("API_KEY"))
 
     chunk_size = 30
     x_taxonomy = {}
     total_chunks = (len(discrete_fields) + chunk_size - 1) // chunk_size
 
-    for idx, part in enumerate(islice(chunks(discrete_fields, chunk_size), 5), start=1):
-        print(f"Processing chunk {idx}/{total_chunks} ({len(part)} items)...")
+    for idx, part in enumerate(tqdm(islice(chunks(discrete_fields, chunk_size), total_chunks), total=total_chunks, desc="Classifying chunks"), start=1):
+#        print(f"Processing chunk {idx}/{total_chunks} ({len(part)} items)...")
         content = f"Discrete fields:\n{part}\n\nTaxonomies:\n{taxonomy}\n\n"
         response = client.chat.completions.create(
             model="Qwen/Qwen3-32B",
@@ -130,17 +131,6 @@ def apply_taxonomy(discrete_fields: list[str], taxonomy: list[str]):
                         "- You MUST choose exactly one value from the allowed classification list for each field.\n"
                         "- If no suitable classification exists for a field, output the value `null` (JSON null) for that field.\n"
                         "- Never invent or output any classification value not included in the list.\n"
-                        "- If unsure between two, use these defaults:\n"
-                        "  - BJ → \"Baixada\"\n"
-                        "  - CL → \"Carrer\"\n"
-                        "  - PZ → \"Plaça\"\n"
-                        "  - AV → \"Avinguda\"\n"
-                        "  - PJ → \"Passatge\"\n"
-                        "  - PS → \"Passeig\" or \"Pas\"\n"
-                        "  - RB → \"Rambla\"\n"
-                        "  - TT → \"Torrent\"\n"
-                        "- You MUST write the taxonomy exactly as it appears in the allowed list, including accents, case, articles and prepositions.\n"
-                        "- Do NOT reorder, remove, or change any words from the taxonomy value.\n\n"
                         "Output format:\n"
                         "Return ONLY a valid JSON object with \"field\": \"taxonomy\" pairs, nothing else.\n\n"
                     )

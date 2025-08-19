@@ -8,11 +8,6 @@ import pandas as pd
 import pprint
 
 
-def chunks(lst, size):
-    for i in range(0, len(lst), size):
-        yield lst[i:i+size]
-
-
 def endesa():
     gp = gpd.read_file("../barcelona_carrerer.gpkg")
     taxonomy = list(gp["NOM_CARRER"].unique())
