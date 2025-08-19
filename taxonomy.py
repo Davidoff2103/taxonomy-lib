@@ -1,12 +1,12 @@
 from dotenv import load_dotenv
 import os
+import faiss
 import json
 import re
-import textdistance
-import unicodedata
+import numpy as np
 
 from itertools import islice
-#from langchain_community.vectorstores import Chroma
+from langchain_community.vectorstores import Chroma
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from openai import OpenAI
@@ -67,37 +67,42 @@ def normalize_street_name(street: str):
     normalized_first = MAPPING.get(first_word, first_word)
     return f"{normalized_first} {rest}".strip()
 
-def apply_cities_taxonomy(discrete_fields: list[str], taxonomy: list[str]):
+def apply_taxonomy_similarity(discrete_fields: list[str], taxonomy: list[str], category_type: str = None):
     embedder = HuggingFaceEmbeddings(
         model_name="all-mpnet-base-v2",
         model_kwargs={"device": "cuda"}
     )
-    #vectordb = Chroma.from_texts(
-    #    texts=taxonomy,
-    #    embedding=embedder,
-    #    persist_directory="./chroma_streets",
-    #    collection_metadata={"hnsw:space": "cosine"}
-    #)
-    vectordb = FAISS.from_texts(
+
+    vectordb = Chroma.from_texts(
         texts=taxonomy,
-        embedding=embedder
+        embedding=embedder,
+        persist_directory="./chroma",
+        collection_metadata={"hnsw:space": "l2"}
     )
+#    vectordb = FAISS.from_texts(
+#        texts=taxonomy,
+#        embedding=embedder
+#    )
 
     results = {}
     to_check = 0
-    for street in discrete_fields:
-        result = vectordb.similarity_search_with_score(normalize_street_name(street), k=1)
+    for field in discrete_fields:
+        if category_type == "streets":
+            result = vectordb.similarity_search_with_score(normalize_street_name(field), k=1)
+        else:
+            result = vectordb.similarity_search_with_score(field, k=1)
+
         if result:
-            matched_street, score = result[0]
+            match, score = result[0]
             if score >= 0.35:
                 to_check += 1
-                results[street] = {"matched_street": matched_street.page_content, "to_check": True}
+                results[field] = {"match": match.page_content, "to_check": True}
             else:
-                results[street] = {"matched_street": matched_street.page_content}
-            print(f"{street} → {matched_street.page_content} (Score: {score:.2f})")
+                results[field] = {"match": match.page_content}
+            print(f"{field} → {match.page_content} (Score: {score:.2f})")
         else:
-            print(f"{street} → None")
-    print(round(to_check*100/len(discrete_fields), 2), f"must be checked ({to_check}/{len(discrete_fields)})")
+            print(f"{field} → None")
+    print(round(to_check*100/len(discrete_fields), 2), f"% must be checked ({to_check}/{len(discrete_fields)})")
     return results
 
 def chunks(lst, size):
