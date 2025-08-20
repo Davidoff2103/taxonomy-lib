@@ -1,11 +1,14 @@
 from dotenv import load_dotenv
 from tqdm import tqdm
+import asyncio
 import os
 import faiss
 import json
 import re
 import numpy as np
 
+from googletrans import Translator
+from deep_translator import GoogleTranslator
 from itertools import islice
 from langchain_community.vectorstores import Chroma
 from langchain_community.vectorstores import FAISS
@@ -177,6 +180,37 @@ def analyze_text_field(field_name: str, field_value: str, task: Literal["label",
     )
 
     return re.sub(r"<think>.*?</think>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip()
+
+
+def translate_taxonomy_reasoning(src_lang, dest_lang, headers):
+    client = OpenAI(base_url=os.getenv("SERVER_URL"), api_key=os.getenv("API_KEY"))
+    response = client.chat.completions.create(
+        model="Qwen/Qwen3-32B",
+        messages=[
+            {"role": "system", "content": "You are an assistant that translate column names. You have to respond with a JSON where the key is the original text and the value is the translated text."},
+            {"role": "user", "content": f"Translate the following list from {src_lang} to {dest_lang}: {json.dumps(headers, ensure_ascii=False)}"}
+        ]
+    )
+    return json.loads(re.sub(r"<think>.*?</think>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip())
+
+def translate_taxonomy_library(src_lang, dest_lang, headers):
+#    headers = [f"'{h}'" for h in headers]
+    translations = GoogleTranslator(source=src_lang, target=dest_lang).translate_batch(headers)
+    results = dict(zip(headers, translations))
+ #   results_clean = {
+ #       k[1:-1] if k.startswith("'") and k.endswith("'") else k:
+ #       v[1:-1] if v.startswith("'") and v.endswith("'") else v
+ #       for k, v in results.items()
+ #   }
+    return results
+
+async def translate_taxonomy2(src_lang, dest_lang, headers):
+    results = {}
+    async with Translator() as translator:
+        for header in headers:
+            result = await translator.translate(header, src=src_lang, dest=dest_lang)
+            results[header] = result.text
+    return results
 
 
 def main():
