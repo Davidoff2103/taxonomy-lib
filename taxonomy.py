@@ -7,8 +7,6 @@ import json
 import re
 import numpy as np
 
-from googletrans import Translator
-from deep_translator import GoogleTranslator
 from itertools import islice
 from langchain_community.vectorstores import Chroma
 from langchain_community.vectorstores import FAISS
@@ -192,25 +190,6 @@ def translate_taxonomy_reasoning(src_lang, dest_lang, headers):
         ]
     )
     return json.loads(re.sub(r"<think>.*?</think>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip())
-
-def translate_taxonomy_library(src_lang, dest_lang, headers):
-#    headers = [f"'{h}'" for h in headers]
-    translations = GoogleTranslator(source=src_lang, target=dest_lang).translate_batch(headers)
-    results = dict(zip(headers, translations))
- #   results_clean = {
- #       k[1:-1] if k.startswith("'") and k.endswith("'") else k:
- #       v[1:-1] if v.startswith("'") and v.endswith("'") else v
- #       for k, v in results.items()
- #   }
-    return results
-
-async def translate_taxonomy2(src_lang, dest_lang, headers):
-    results = {}
-    async with Translator() as translator:
-        for header in headers:
-            result = await translator.translate(header, src=src_lang, dest=dest_lang)
-            results[header] = result.text
-    return results
 
 
 def main():

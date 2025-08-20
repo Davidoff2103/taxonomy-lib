@@ -89,7 +89,6 @@ def translate():
                'Viviendas principales - Tipo de dispositivo de energía renovable']
 
     result = tx.translate_taxonomy_reasoning("es", "en", headers)
-    # result = tx.translate_taxonomy_library("es", "en", headers)
     print(result)
 
 
