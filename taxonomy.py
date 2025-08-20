@@ -1,3 +1,4 @@
+from langchain_community.utilities import SerpAPIWrapper
 from dotenv import load_dotenv
 import os
 import json
@@ -47,7 +48,7 @@ def apply_taxonomy(discrete_fields: list[str], taxonomy: list[str]):
     content = f"Discrete fields:\n{discrete_fields}\n\nTaxonomies:\n{taxonomy}\n\nClassify each field into one of the taxonomies. Respond only with key-value pairs in JSON format."
 
     messages = [
-                {"role": "system", "content": "You are an assistant that classifies discrete dataset fields into taxonomies. Only use the web_search tool if you do not have enough information to assign a taxonomy confidently. Respond only with a JSON object containing field: taxonomy pairs."},
+                {"role": "system", "content": "You are an assistant that classifies discrete dataset fields into taxonomies. Only use the web_search tool if you do not have enough information to assign a taxonomy confidently and you think you can find useful information on internet. Respond only with a JSON object containing field: taxonomy pairs."},
                 {"role": "user", "content": content}
             ]
     response = client.chat.completions.create(
@@ -85,7 +86,10 @@ def apply_taxonomy(discrete_fields: list[str], taxonomy: list[str]):
         print(result)
         messages.append({
             "role": "tool",
-            "content": result,
+            "content": json.dumps({
+                "query": args["query"],
+                "result": result
+            }),
             "tool_call_id": call.id,
             "name": call.function.name
         })
@@ -118,7 +122,7 @@ def analyze_text_field(field_name: str, field_value: str, task: Literal["label",
     response = client.chat.completions.create(
         model="Qwen/Qwen3-32B",
         messages=[
-            {"role": "system", "content": "You are an assistant that analyzes natural language text fields. You have to respond with only the labell or only the summary, without any additional text."},
+            {"role": "system", "content": "You are an assistant that analyzes natural language text fields. You have to respond with only the label or only the summary, without any additional text."},
             {"role": "user", "content": user_prompt}
         ]
     )
