@@ -88,7 +88,24 @@ def translate():
                'Viviendas principales - Número de plazas de garaje',
                'Viviendas principales - Tipo de dispositivo de energía renovable']
 
-    result = tx.translate_taxonomy_reasoning("es", "en", headers)
+    headers2 = ['Viviendas principales - Estado de conservación ~ Bueno',
+                'Viviendas principales - Estado de conservación ~ Excelente',
+                'Viviendas principales - Estado de conservación ~ Malo',
+                'Viviendas principales - Estado de conservación ~ Muy bueno',
+                'Viviendas principales - Estado de conservación ~ Normal',
+                'Viviendas principales - Estado de conservación ~ Regular'
+               ]
+
+    headers3 = ['Viviendas principales - Tipo de problemática en la zona ~ Contaminación o malos olores (%)',
+                'Viviendas principales - Tipo de problemática en la zona ~ Delincuencia (%)',
+                'Viviendas principales - Tipo de problemática en la zona ~ Malas comunicaciones (%)',
+                'Viviendas principales - Tipo de problemática en la zona ~ Molestias relacionadas con actividades turísticas o locales de hostelería (%)',
+                'Viviendas principales - Tipo de problemática en la zona ~ Poca limpieza en las calles (%)',
+                'Viviendas principales - Tipo de problemática en la zona ~ Pocas zonas verdes (%)',
+                'Viviendas principales - Tipo de problemática en la zona ~ Ruidos exteriores (%)'
+               ]
+
+    result = tx.translate_taxonomy_reasoning("es", "en", headers3)
     print(result)
 
 
