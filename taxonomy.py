@@ -283,11 +283,12 @@ def web_search(query):
     #return serp_api_wrapper.run(query)
     results = []
     for r in search(query, advanced=True, num_results=5):
-        results.append({
-            "url": r.url,
-            "title": r.title,
-            "description": r.description
-        })
+        if r.url or r.title or r.description:
+            results.append({
+                "url": r.url,
+                "title": r.title,
+                "description": r.description
+            })
 
     return results
 
