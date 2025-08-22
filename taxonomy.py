@@ -150,7 +150,7 @@ def reasoning(client, part, taxonomy, classification_description):
                     "- Never invent or output any classification value not included in the list.\n"
                     "Output format:\n"
                     "Return ONLY a valid JSON object with \"field\": \"taxonomy\" pairs for all provided values, nothing else.\n"
-                    "Before providing the answer, you must check all discrete fields values provided by the user are present in your response,"
+                    "Check all discrete fields values provided by the user are present in your response, "
                     "written exactly as originally (including typos).\n\n"
                 )
             },
@@ -213,6 +213,21 @@ def reasoning(client, part, taxonomy, classification_description):
     return partial_result
 
 
+CHECKPOINT_FILE = "taxonomy_progress.json"
+
+
+def load_checkpoint():
+    if os.path.exists(CHECKPOINT_FILE):
+        with open(CHECKPOINT_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def save_checkpoint(data):
+    with open(CHECKPOINT_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
 def apply_taxonomy_reasoning(discrete_fields: list[str], taxonomy: list[str], classification_description: str):
     client = OpenAI(base_url=os.getenv("SERVER_URL"), api_key=os.getenv("API_KEY"))
 
@@ -220,13 +235,22 @@ def apply_taxonomy_reasoning(discrete_fields: list[str], taxonomy: list[str], cl
     x_taxonomy = {}
     total_chunks = (len(discrete_fields) + chunk_size - 1) // chunk_size
 
+    x_taxonomy = load_checkpoint()
+    already_done = set(x_taxonomy.keys())
+
     for idx, part in enumerate(tqdm(islice(chunks(discrete_fields, chunk_size), total_chunks), total=total_chunks, desc="Classifying chunks"), start=1):
 #        print(f"Processing chunk {idx}/{total_chunks} ({len(part)} items)...")
+        if all(field in already_done for field in part):
+            print(f"Chunk {idx} already processed, skipping...")
+            continue
+
         while True:
             try:
                 partial_result = reasoning(client, part, taxonomy, classification_description)
                 validated = TaxonomyModel(partial_result=partial_result, taxonomy=taxonomy, discrete_fields=part)
                 x_taxonomy.update(validated.partial_result)
+                save_checkpoint(x_taxonomy)
+                print(f"✅ Chunk {idx} validated and saved.")
                 break
             except ValidationError as e:
                 print(f"Validation failed for chunk {idx}, retrying...\n{e}")
@@ -283,7 +307,7 @@ def web_search(query):
     #return serp_api_wrapper.run(query)
     results = []
     for r in search(query, advanced=True, num_results=5):
-        if r.url or r.title or r.description:
+        if r.url and r.title and r.description:
             results.append({
                 "url": r.url,
                 "title": r.title,
