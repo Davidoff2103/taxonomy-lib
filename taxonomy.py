@@ -1,22 +1,24 @@
-from googlesearch import search
-from dotenv import load_dotenv
-from pydantic import field_validator, BaseModel, ValidationError
-from tqdm import tqdm
-import asyncio
-import os
-import faiss
+import glob
 import json
+import os
 import re
-import numpy as np
-
 from itertools import islice
-from langchain_community.vectorstores import Chroma
-from langchain_community.vectorstores import FAISS
-from langchain_huggingface import HuggingFaceEmbeddings
-from openai import OpenAI
 from typing import Literal
 
+from dotenv import load_dotenv
+from googlesearch import search
+from langchain_community.vectorstores import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
+from openai import OpenAI
+from pydantic import field_validator, BaseModel, ValidationError
+from tqdm import tqdm
+from utils import normalize_street_name
+
 load_dotenv()
+
+MODEL_NAME = os.getenv("MODEL_NAME")
+SERVER_URL = os.getenv("SERVER_URL")
+API_KEY = os.getenv("API_KEY")
 
 
 class TaxonomyModel(BaseModel):
@@ -53,8 +55,25 @@ class TranslationModel(BaseModel):
         return v
 
 
+def deprecate_cache_file(file: str = None):
+    if os.path.isfile(file):
+        os.remove(file)
+        print(f"Removed file: {file}")
+    else:
+        files = glob.glob("*.tmp")
+        if files:
+            for f in files:
+                try:
+                    os.remove(f)
+                    print(f"Removed file: {f}")
+                except Exception as e:
+                    print(f"Cannot remove {f}: {e}")
+        else:
+            print("No files to remove")
+
+
 def propose_taxonomy(field: str, description: str, discrete_fields: list[str] = None) -> list[str]:
-    client = OpenAI(base_url=os.getenv("SERVER_URL"), api_key=os.getenv("API_KEY"))
+    client = OpenAI(base_url=SERVER_URL, api_key=API_KEY)
     examples = """
     Example 1:
     Field: "Color"
@@ -82,37 +101,22 @@ def propose_taxonomy(field: str, description: str, discrete_fields: list[str] = 
 
     # Qwen/Qwen3-32B
     response = client.chat.completions.create(
-        model="Qwen/Qwen3-32B",
+        model=MODEL_NAME,
         messages=[
-            {"role": "system", "content": "You are an assistant responsible for proposing taxonomies based on examples. You must respond only with the list of proposed taxonomies."},
+            {"role": "system", "content": (
+                "You are an assistant responsible for proposing taxonomies based on examples."
+                "You must respond only with the list of proposed taxonomies."
+            )},
             {"role": "user", "content": message}
         ]
     )
 
     return json.loads(response.choices[0].message.content.split("</think>", 1)[1].strip())
 
-def normalize_street_name(street: str):
-    s = street.split()
-    MAPPING = {
-        "CL": "Carrer",
-        "BJ": "Baixada",
-        "PZ": "Plaça",
-        "AV": "Avinguda",
-        "PJ": "Passatge",
-        "PS": "Passeig",
-        "RB": "Rambla",
-        "TT": "Torrent"
-    }
-
-    parts = street.strip().split(maxsplit=1)
-    first_word = parts[0]
-    rest = parts[1]
-    normalized_first = MAPPING.get(first_word, first_word)
-    return f"{normalized_first} {rest}".strip()
 
 def apply_taxonomy_similarity(discrete_fields: list[str], taxonomy: list[str], category_type: str = None):
     embedder = HuggingFaceEmbeddings(
-        model_name="all-mpnet-base-v2",
+        model_name=os.getenv("EMBEDDER_MODEL"),
         model_kwargs={"device": "cuda"}
     )
 
@@ -148,46 +152,56 @@ def apply_taxonomy_similarity(discrete_fields: list[str], taxonomy: list[str], c
     print(round(to_check*100/len(discrete_fields), 2), f"% must be checked ({to_check}/{len(discrete_fields)})")
     return results
 
+
 def chunks(lst, size):
     for i in range(0, len(lst), size):
         yield lst[i:i+size]
 
+
 def reasoning(client, part, taxonomy, classification_description):
-    content = f"Discrete fields values:\n{part}\n\nTaxonomies:\n{taxonomy}\n\nClassification description: {classification_description}\n\n"
+    content = (f"Discrete fields values:\n{part}\n\nTaxonomies:\n{taxonomy}\n\n"
+               f"Classification description: {classification_description}\n\n")
     messages = [
             {
                 "role": "system",
                 "content": (
-                    "You are an assistant that classifies discrete dataset fields values into one of the allowed classification values.\n\n"
+                    "You are an assistant that classifies discrete dataset fields values into one "
+                    "of the allowed classification values.\n\n"
                     "Rules:\n"
                     "- You MUST choose exactly one value from the allowed classification list for each field value.\n"
-                    "- First, if you do not have enough information to assign a classification to certain field values confidently, "
+                    "- First, if you do not have enough information to assign a classification "
+                    "to certain field values confidently, "
                     "you must generate a tool call for the tool web_search to get information about each of them.\n"
-                    "- If no suitable classification exists for a field value, output the value `null` (JSON null) for that.\n"
+                    "- If no suitable classification exists for a field value, "
+                    "output the value `null` (JSON null) for that.\n"
                     "- Never invent or output any classification value not included in the list.\n"
                     "Output format:\n"
-                    "Return ONLY a valid JSON object with \"field\": \"taxonomy\" pairs for all provided values, nothing else.\n"
+                    "Return ONLY a valid JSON object with \"field\": \"taxonomy\" pairs for all provided values, "
+                    "nothing else.\n"
                     "Check all discrete fields values provided by the user are present in your response, "
                     "written exactly as originally (including typos).\n"
-                    "Be especially careful with the quotes of the same type that were used to define the string, you can't forget any.\n\n"
+                    "Be especially careful with the quotes of the same type that were used to define the string, "
+                    "you can't forget any.\n\n"
                 )
             },
             {"role": "user", "content": content}
         ]
     response = client.chat.completions.create(
-        model="Qwen/Qwen3-32B",
+        model=MODEL_NAME,
         messages=messages,
         tools = [{
             "type": "function",
             "function": {
                 "name": "web_search",
-                "description": "Get information about a discrete field value when you do not have enough information to classify it.",
+                "description": "Get information about a discrete field value when you do not have "
+                               "enough information to classify it.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "The query to search about, consisting of the concatenation of the discrete field value and the classification description (provided by the user)."
+                            "description": "The query to search about, consisting of the concatenation of the discrete "
+                                           "field value and the classification description (provided by the user)."
                         }
                     },
                     "required": ["query"]
@@ -220,45 +234,46 @@ def reasoning(client, part, taxonomy, classification_description):
                 "name": call.function.name
             })
         response = client.chat.completions.create(
-            model="Qwen/Qwen3-32B",
+            model=MODEL_NAME,
             messages=messages
         )
-    print(re.sub(r"<think>.*?</think>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip())
     res = re.sub(r"<think>.*?</think>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip()
+    print(res)
     if "```json" in res:
         res = re.sub(r"```json\s*(.*?)\s*```", r"\1", res, flags=re.DOTALL).strip()
     partial_result = json.loads(res)
     return partial_result
 
 
-CHECKPOINT_FILE = "taxonomy_progress.json"
-
-
-def load_checkpoint():
-    if os.path.exists(CHECKPOINT_FILE):
-        with open(CHECKPOINT_FILE, "r", encoding="utf-8") as f:
+def load_checkpoint(tmp_file: str):
+    if os.path.exists(tmp_file):
+        with open(tmp_file, "r", encoding="utf-8") as f:
             return json.load(f)
     return {}
 
 
-def save_checkpoint(data):
-    with open(CHECKPOINT_FILE, "w", encoding="utf-8") as f:
+def save_checkpoint(tmp_file, data):
+    with open(tmp_file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def apply_taxonomy_reasoning(discrete_fields: list[str], taxonomy: list[str], classification_description: str):
-    client = OpenAI(base_url=os.getenv("SERVER_URL"), api_key=os.getenv("API_KEY"))
+def apply_taxonomy_reasoning(discrete_fields: list[str], taxonomy: list[str],
+                             classification_description: str, hash_file: str = None):
+    client = OpenAI(base_url=SERVER_URL, api_key=API_KEY)
 
     chunk_size = 15
     x_taxonomy = {}
     total_chunks = (len(discrete_fields) + chunk_size - 1) // chunk_size
 
-    x_taxonomy = load_checkpoint()
-    already_done = set(x_taxonomy.keys())
+    if hash_file:
+        tmp_file = hash_file + "_cache.tmp"
+        x_taxonomy = load_checkpoint(tmp_file)
+        already_done = set(x_taxonomy.keys())
 
-    for idx, part in enumerate(tqdm(islice(chunks(discrete_fields, chunk_size), total_chunks), total=total_chunks, desc="Classifying chunks"), start=1):
-#        print(f"Processing chunk {idx}/{total_chunks} ({len(part)} items)...")
-        if all(field in already_done for field in part):
+    for idx, part in enumerate(tqdm(islice(chunks(discrete_fields, chunk_size), total_chunks), total=total_chunks,
+                                    desc="Classifying chunks"), start=1):
+        # print(f"Processing chunk {idx}/{total_chunks} ({len(part)} items)...")
+        if hash_file and all(field in already_done for field in part):
             print(f"Chunk {idx} already processed, skipping...")
             continue
 
@@ -268,23 +283,22 @@ def apply_taxonomy_reasoning(discrete_fields: list[str], taxonomy: list[str], cl
                 partial_result = {str(k): v for k, v in zip(part, partial_result.values())}
                 validated = TaxonomyModel(partial_result=partial_result, taxonomy=taxonomy, discrete_fields=part)
                 x_taxonomy.update(validated.partial_result)
-                save_checkpoint(x_taxonomy)
-                print(f"✅ Chunk {idx} validated and saved.")
+
+                if hash_file:
+                    save_checkpoint(tmp_file, x_taxonomy)
+                    print(f"✅ Chunk {idx} validated and cached on {tmp_file}.")
                 break
             except ValidationError as e:
                 print(f"Validation failed for chunk {idx}, retrying...\n{e}")
 
-    # return response.choices[0].message.content
-    # return json.loads(re.sub(r"<think>.*?</think>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip())
     return x_taxonomy
 
 
 def analyze_text_field(field_name: str, field_value: str, task: Literal["label", "summarize"] = "label"):
-    client = OpenAI(base_url=os.getenv("SERVER_URL"), api_key=os.getenv("API_KEY"))
+    client = OpenAI(base_url=SERVER_URL, api_key=API_KEY)
 
     if task not in {"label", "summarize"}:
         raise ValueError("task must be 'label' or 'summarize'")
-
 
     if task == "label":
         user_prompt = (
@@ -297,44 +311,52 @@ def analyze_text_field(field_name: str, field_value: str, task: Literal["label",
             f'Text: "{field_value}"\n\nSummary:'
         )
 
-
     response = client.chat.completions.create(
-        model="Qwen/Qwen3-32B",
+        model=MODEL_NAME,
         messages=[
-            {"role": "system", "content": "You are an assistant that analyzes natural language text fields. You have to respond with only the label or only the summary, without any additional text."},
+            {"role": "system", "content": (
+                "You are an assistant that analyzes natural language text fields."
+                "You have to respond with only the label or only the summary, without any additional text."
+            )},
             {"role": "user", "content": user_prompt}
         ]
     )
 
-    return re.sub(r"<think>.*?</think>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip()
+    return re.sub(
+        r"<think>.*?</think>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip()
 
 
 def translate_taxonomy_reasoning(src_lang, dest_lang, headers):
-    client = OpenAI(base_url=os.getenv("SERVER_URL"), api_key=os.getenv("API_KEY"))
+    client = OpenAI(base_url=SERVER_URL, api_key=API_KEY)
     response = client.chat.completions.create(
-        model="Qwen/Qwen3-32B",
+        model=MODEL_NAME,
         messages=[
             {"role": "system",
-             "content":(
-                  "You are an assistant that translate column names. You have to respond with a JSON where the key is the original text and the value is the translated text.\n"
-                  "Check all headers provided by the user are present in your response, written exactly as originally (including typos).\n"
-              )
-            },
-            {"role": "user", "content": f"Translate the following list from {src_lang} to {dest_lang}: {json.dumps(headers, ensure_ascii=False)}"}
+             "content": (
+                  "You are an assistant that translate column names. "
+                  "You have to respond with a JSON where the key is the original text and "
+                  "the value is the translated text.\n"
+                  "Check all headers provided by the user are present in your response, "
+                  "written exactly as originally (including typos).\n"
+             )},
+            {"role": "user", "content": f"Translate the following list from {src_lang} to {dest_lang}: "
+                                        f"{json.dumps(headers, ensure_ascii=False)}"}
         ]
     )
     try:
-        translations = json.loads(re.sub(r"<think>.*?</think>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip())
+        translations = json.loads(
+            re.sub(r"<think>.*?</think>\s*", "", response.choices[0].message.content,
+                   flags=re.DOTALL).strip())
         validated = TranslationModel(translations=translations, headers=headers)
-        print(f"✅ Translation validated.")
+        print("✅ Translation validated.")
         return validated.translations
     except ValidationError as e:
         print(f"Validation failed for translation...\n{e}")
 
 
 def web_search(query):
-    #serp_api_wrapper = SerpAPIWrapper(serpapi_api_key=os.getenv("SERPAPI_API_KEY"))
-    #return serp_api_wrapper.run(query)
+    # serp_api_wrapper = SerpAPIWrapper(serpapi_api_key=os.getenv("SERPAPI_API_KEY"))
+    # return serp_api_wrapper.run(query)
     results = []
     for r in search(query, advanced=True, num_results=5):
         if r.url and r.title and r.description:
@@ -345,10 +367,3 @@ def web_search(query):
             })
 
     return results
-
-
-def main():
-    print(propose_taxonomy("SystemEnergySource", "The primary source or type of energy utilized by a system to operate"))
-
-if __name__ == "__main__":
-    main()
