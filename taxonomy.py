@@ -99,7 +99,6 @@ def propose_taxonomy(field: str, description: str, discrete_fields: list[str] = 
     if discrete_fields:
         message += f"\nTake the following list as discrete fields to classify: {discrete_fields}."
 
-    # Qwen/Qwen3-32B
     response = client.chat.completions.create(
         model=MODEL_NAME,
         messages=[
@@ -126,10 +125,6 @@ def apply_taxonomy_similarity(discrete_fields: list[str], taxonomy: list[str], c
         persist_directory="./chroma",
         collection_metadata={"hnsw:space": "l2"}
     )
-#    vectordb = FAISS.from_texts(
-#        texts=taxonomy,
-#        embedding=embedder
-#    )
 
     results = {}
     to_check = 0
@@ -211,7 +206,6 @@ def reasoning(client, part, taxonomy, classification_description):
         # temperature=0
         # extra_body={"chat_template_kwargs": {"enable_thinking": False}}
     )
-    # print(response.choices[0].message.content)
 
     completion_tool_calls = response.choices[0].message.tool_calls
 
@@ -355,8 +349,6 @@ def translate_taxonomy_reasoning(src_lang, dest_lang, headers):
 
 
 def web_search(query):
-    # serp_api_wrapper = SerpAPIWrapper(serpapi_api_key=os.getenv("SERPAPI_API_KEY"))
-    # return serp_api_wrapper.run(query)
     results = []
     for r in search(query, advanced=True, num_results=5):
         if r.url and r.title and r.description:
