@@ -109,8 +109,7 @@ def propose_taxonomy(field: str, description: str, discrete_fields: list[str] = 
             {"role": "user", "content": message}
         ]
     )
-
-    return json.loads(response.choices[0].message.content.split("</think>", 1)[1].strip())
+    return json.loads(re.sub(r"<think>.*?</think>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip())
 
 
 def apply_taxonomy_similarity(discrete_fields: list[str], taxonomy: list[str], category_type: str = None):
