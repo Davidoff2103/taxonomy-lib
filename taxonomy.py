@@ -1,4 +1,3 @@
-```python
 import glob
 import json
 import os
@@ -337,7 +336,7 @@ def reasoning(client, part, taxonomy, classification_description):
     print(res)
     if "```json" in res:
         # Extract JSON content from code blocks if present
-        res = re.sub(r"```json\s*(.*?)\s*```", r"\\1", res, flags=re.DOTALL).strip()
+        res = re.sub(r"```json\s*(.*?)\s*```", r"\1", res, flags=re.DOTALL).strip()
     partial_result = json.loads(res)
     return partial_result
 
@@ -526,4 +525,3 @@ def web_search(query):
             })
 
     return results
-```
