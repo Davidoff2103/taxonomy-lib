@@ -109,7 +109,7 @@ def propose_taxonomy(field: str, description: str, discrete_fields: list[str] = 
             {"role": "user", "content": message}
         ]
     )
-    return json.loads(re.sub(r"<think>.*?</think>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip())
+    return json.loads(re.sub(r"<[^>]+>.*?</[^>]+>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip())
 
 
 def apply_taxonomy_similarity(discrete_fields: list[str], taxonomy: list[str], category_type: str = None):
@@ -230,7 +230,7 @@ def reasoning(client, part, taxonomy, classification_description):
             model=MODEL_NAME,
             messages=messages
         )
-    res = re.sub(r"<think>.*?</think>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip()
+    res = re.sub(r"<[^>]+>.*?</[^>]+>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip()
     print(res)
     if "```json" in res:
         res = re.sub(r"```json\s*(.*?)\s*```", r"\1", res, flags=re.DOTALL).strip()
@@ -316,7 +316,7 @@ def analyze_text_field(field_name: str, field_value: str, task: Literal["label",
     )
 
     return re.sub(
-        r"<think>.*?</think>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip()
+        r"<[^>]+>.*?</[^>]+>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip()
 
 
 def translate_taxonomy_reasoning(src_lang, dest_lang, headers):
@@ -338,7 +338,7 @@ def translate_taxonomy_reasoning(src_lang, dest_lang, headers):
     )
     try:
         translations = json.loads(
-            re.sub(r"<think>.*?</think>\s*", "", response.choices[0].message.content,
+            re.sub(r"<[^>]+>.*?</[^>]+>\s*", "", response.choices[0].message.content,
                    flags=re.DOTALL).strip())
         validated = TranslationModel(translations=translations, headers=headers)
         print("✅ Translation validated.")
