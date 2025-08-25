@@ -390,7 +390,7 @@ def apply_taxonomy_reasoning(discrete_fields: list[str], taxonomy: list[str],
     total_chunks = (len(discrete_fields) + chunk_size - 1) // chunk_size
 
     if hash_file:
-        tmp_file = hash_file + "_cache.tmp"
+        tmp_file = "." + hash_file + "_cache.tmp"
         x_taxonomy = load_checkpoint(tmp_file)
         already_done = set(x_taxonomy.keys())
 

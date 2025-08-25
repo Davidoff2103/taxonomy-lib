@@ -1,10 +1,8 @@
-import geopandas as gpd
 import os
 import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import taxonomy as tx
-import pandas as pd
 import pprint
 
 
