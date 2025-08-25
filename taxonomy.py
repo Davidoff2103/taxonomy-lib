@@ -30,17 +30,30 @@ class TaxonomyModel(BaseModel):
         taxonomy = info.data.get("taxonomy", [])
         if set(v.keys()) != set(fields):
             raise ValueError(
-                f"Las claves de la lista {fields} no coinciden exactamente con las del diccionario {list(v.keys())}"
+                f"The keys in the list {fields} do not exactly match the keys in the dictionary {list(v.keys())}"
             )
         elif not set(v.values()).issubset(set(taxonomy + ["null"] + [None])):
             raise ValueError(
-                f"Algunos valores del diccionario {list(v.values())} no están en la lista {taxonomy}"
+                f"Some values of the dictionary {list(v.values())} are not in the list {taxonomy}"
             )
-        print("Validation succeed.\n")
         return v
 
 
-def propose_taxonomy(field: str, description:str) -> list[str]:
+class TranslationModel(BaseModel):
+    headers: list[str]
+    translations: dict
+
+    @field_validator("translations")
+    def keys_must_match_data(cls, v, info):
+        headers = info.data.get("headers", [])
+        if set(v.keys()) != set(headers):
+            raise ValueError(
+                f"The keys in the list {headers} do not exactly match the keys in the dictionary {list(v.keys())}"
+            )
+        return v
+
+
+def propose_taxonomy(field: str, description: str, discrete_fields: list[str] = None) -> list[str]:
     client = OpenAI(base_url=os.getenv("SERVER_URL"), api_key=os.getenv("API_KEY"))
     examples = """
     Example 1:
@@ -63,6 +76,10 @@ def propose_taxonomy(field: str, description:str) -> list[str]:
 
     Propose a taxonomy.
     """
+
+    if discrete_fields:
+        message += f"\nTake the following list as discrete fields to classify: {discrete_fields}."
+
     # Qwen/Qwen3-32B
     response = client.chat.completions.create(
         model="Qwen/Qwen3-32B",
@@ -151,7 +168,8 @@ def reasoning(client, part, taxonomy, classification_description):
                     "Output format:\n"
                     "Return ONLY a valid JSON object with \"field\": \"taxonomy\" pairs for all provided values, nothing else.\n"
                     "Check all discrete fields values provided by the user are present in your response, "
-                    "written exactly as originally (including typos).\n\n"
+                    "written exactly as originally (including typos).\n"
+                    "Be especially careful with the quotes of the same type that were used to define the string, you can't forget any.\n\n"
                 )
             },
             {"role": "user", "content": content}
@@ -247,6 +265,7 @@ def apply_taxonomy_reasoning(discrete_fields: list[str], taxonomy: list[str], cl
         while True:
             try:
                 partial_result = reasoning(client, part, taxonomy, classification_description)
+                partial_result = {str(k): v for k, v in zip(part, partial_result.values())}
                 validated = TaxonomyModel(partial_result=partial_result, taxonomy=taxonomy, discrete_fields=part)
                 x_taxonomy.update(validated.partial_result)
                 save_checkpoint(x_taxonomy)
@@ -295,11 +314,22 @@ def translate_taxonomy_reasoning(src_lang, dest_lang, headers):
     response = client.chat.completions.create(
         model="Qwen/Qwen3-32B",
         messages=[
-            {"role": "system", "content": "You are an assistant that translate column names. You have to respond with a JSON where the key is the original text and the value is the translated text."},
+            {"role": "system",
+             "content":(
+                  "You are an assistant that translate column names. You have to respond with a JSON where the key is the original text and the value is the translated text.\n"
+                  "Check all headers provided by the user are present in your response, written exactly as originally (including typos).\n"
+              )
+            },
             {"role": "user", "content": f"Translate the following list from {src_lang} to {dest_lang}: {json.dumps(headers, ensure_ascii=False)}"}
         ]
     )
-    return json.loads(re.sub(r"<think>.*?</think>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip())
+    try:
+        translations = json.loads(re.sub(r"<think>.*?</think>\s*", "", response.choices[0].message.content, flags=re.DOTALL).strip())
+        validated = TranslationModel(translations=translations, headers=headers)
+        print(f"✅ Translation validated.")
+        return validated.translations
+    except ValidationError as e:
+        print(f"Validation failed for translation...\n{e}")
 
 
 def web_search(query):

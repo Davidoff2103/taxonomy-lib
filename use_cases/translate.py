@@ -105,7 +105,7 @@ def translate():
                 'Viviendas principales - Tipo de problemática en la zona ~ Ruidos exteriores (%)'
                ]
 
-    result = tx.translate_taxonomy_reasoning("es", "en", headers3)
+    result = tx.translate_taxonomy_reasoning("es", "en", headers)
     print(result)
 
 
