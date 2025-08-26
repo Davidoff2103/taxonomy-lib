@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bee-taxonomy"
+version = "0.0.5"
+authors = [
+  { name="David Blanco Bautista", email="davidoff.d777@gmail.com" },
+]
+description = "A library for taxonomy management."
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+dependencies = ["googlesearch-python==1.3.0",
+                "python-dotenv==1.1.1",
+                "langchain-community==0.3.27",
+                "langchain-huggingface==0.3.1",
+                "openai==1.101.0"
+               ]
+build-backend = "hatchling.build"
+
+[project.urls]
+Homepage = "https://github.com/Davidoff2103/taxonomy-lib"

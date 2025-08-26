@@ -12,7 +12,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from openai import OpenAI
 from pydantic import field_validator, BaseModel, ValidationError
 from tqdm import tqdm
-from utils import normalize_street_name
+from .utils import normalize_street_name
 
 load_dotenv()
 
