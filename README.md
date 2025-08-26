@@ -4,15 +4,15 @@ This module provides functions for taxonomy creation, text classification, and h
 
 ## Usage
 
-Import with: `from bee_taxonomy import taxonomy`
-
-Use as: `taxonomy.function_name(...)`
+Import the module with:
+```python
+from bee_taxonomy import taxonomy
+```
 
 ## Main Functions
 
-### 1. `propose_taxonomy(field: str, description: str, discrete_fields: list[str] = None)`
+### 1. `taxonomy.propose_taxonomy(field: str, description: str, discrete_fields: list[str] = None)`
 **Purpose**: Generate taxonomy suggestions using OpenAI
-
 **Parameters**:
 - `field`: Name of the field to categorize
 - `description`: Description of the field's purpose
@@ -20,7 +20,7 @@ Use as: `taxonomy.function_name(...)`
 
 **Example**:
 ```python
-propose_taxonomy(
+taxonomy.propose_taxonomy(
     field="Color",
     description="Vehicle paint color classification",
     discrete_fields=["Red", "Blue", "Green", "Custom"]
@@ -28,9 +28,8 @@ propose_taxonomy(
 # Returns: ["Red", "Blue", "Green", "Other"]
 ```
 
-### 2. `apply_taxonomy_similarity(discrete_fields: list[str], taxonomy: list[str], category_type: str = None)`
+### 2. `taxonomy.apply_taxonomy_similarity(discrete_fields: list[str], taxonomy: list[str], category_type: str = None)`
 **Purpose**: Classify values using semantic similarity with vector database
-
 **Parameters**:
 - `discrete_fields`: Values to classify
 - `taxonomy`: List of allowed classification terms
@@ -46,9 +45,7 @@ taxonomy.apply_taxonomy_similarity(
 # Returns: {'Rd': {'match': 'Road', 'score': 0.92}, ...}
 ```
 
-### 3. `apply_taxonomy_reasoning(discrete_fields: list[str], taxonomy: list[str], classification_description: str, hash_file: str = None)`
-**Purpose**: Classify values in chunks with validation and checkpointing
-
+### 3. `taxonomy.apply_taxonomy_reasoning(discrete_fields: list[str], taxonomy: list[str], classification_description: str, hash_file: str = None)`
 **Parameters**:
 - `discrete_fields`: List of values to classify
 - `taxonomy`: List of allowed categories
@@ -65,9 +62,7 @@ taxonomy.apply_taxonomy_reasoning(
 # Returns: {'Quick Brown Fox': 'Animal', 'Lazy Dog': 'Animal'
 ```
 
-### 4. `translate_headers_reasoning(src_lang, dest_lang, headers)`
-**Purpose**: Translate column headers between languages
-
+### 4. `taxonomy.translate_headers_reasoning(src_lang, dest_lang, headers)`
 **Parameters**:
 - `src_lang`: Source language code
 - `dest_lang`: Target language code
@@ -83,9 +78,7 @@ taxonomy.translate_headers_reasoning(
 # Returns: {'Street Name': 'Nombre de la Calle', 'Zip Code': 'Código Postal'
 ```
 
-### 5. `analyze_text_field(field_name: str, field_value: str, task: Literal["label", "summarize"] = "label")`
-**Purpose**: Analyze text for labeling or summarization
-
+### 5. `taxonomy.analyze_text_field(field_name: str, field_value: str, task: Literal["label", "summarize"] = "label")`
 **Parameters**:
 - `field_name`: Name of the text field
 - `field_value`: Text to analyze
@@ -105,11 +98,9 @@ taxonomy.analyze_text_field(
 - `MODEL_NAME`: Hugging Face model identifier
 - `SERVER_URL`: Base URL for OpenAI-compatible API
 - `API_KEY`: Authentication token for the API
-- `EMBEDDER_MODEL`: Hugging Face embedding model name
+- `EMBEDDER_MODEL`: Embedding model for semantic similarity
 
-## Key Features
-- Uses Hugging Face embeddings for semantic similarity
-- Implements validation models with Pydantic
-- Includes progress checkpointing for large datasets
-- Handles special cases like street name normalization
-- Uses Google search for ambiguous classifications
+## Features
+- Validation workflow with Pydantic models
+- Progress checkpointing for large datasets
+- Google search integration for ambiguous classifications
