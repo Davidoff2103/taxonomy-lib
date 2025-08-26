@@ -464,7 +464,7 @@ def analyze_text_field(field_name: str, field_value: str, task: Literal["label",
         r"<[^>]+>.*?</[^>]+>\s*", "", response.choices[0].message.content,
         flags=re.DOTALL).strip()
 
-def translate_taxonomy_reasoning(src_lang, dest_lang, headers):
+def translate_headers_reasoning(src_lang, dest_lang, headers):
     """
     Translate column headers from one language to another.
     
