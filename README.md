@@ -1,11 +1,12 @@
 # Taxonomy Library README
 
-**Import Usage**:
-```python
-from bee_taxonomy import taxonomy
-```
-
 This module provides functions for taxonomy creation, text classification, and header translation using AI models and vector similarity search.
+
+## Usage
+
+Import with: `from bee_taxonomy import taxonomy`
+
+Use as: `taxonomy.function_name(...)`
 
 ## Main Functions
 
@@ -19,7 +20,7 @@ This module provides functions for taxonomy creation, text classification, and h
 
 **Example**:
 ```python
-taxonomy.propose_taxonomy(
+propose_taxonomy(
     field="Color",
     description="Vehicle paint color classification",
     discrete_fields=["Red", "Blue", "Green", "Custom"]
@@ -100,14 +101,15 @@ taxonomy.analyze_text_field(
 # Returns: "Office Furniture"
 ```
 
+## Environment Variables
+- `MODEL_NAME`: Hugging Face model identifier
+- `SERVER_URL`: Base URL for OpenAI-compatible API
+- `API_KEY`: Authentication token for the API
+- `EMBEDDER_MODEL`: Hugging Face embedding model name
+
 ## Key Features
 - Uses Hugging Face embeddings for semantic similarity
 - Implements validation models with Pydantic
 - Includes progress checkpointing for large datasets
 - Handles special cases like street name normalization
 - Uses Google search for ambiguous classifications
-
-## Environment Variables
-- `MODEL_NAME`: Hugging Face model identifier
-- `SERVER_URL`: Base URL for OpenAI-compatible API
-- `API_KEY`: Authentication token for the API
